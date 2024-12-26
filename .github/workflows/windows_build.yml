@@ -1,0 +1,78 @@
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        node-version: [20.x]
+        runtime:
+          - win-x64
+        include:
+        - runtime: win-x64
+          os: windows-latest
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: "yarn"
+    - run: yarn run ci
+    - run: yarn run lint
+    - name: Get Version Number
+      id: getPackageInfo
+      uses: jaywcjlove/github-action-package@main
+
+    - name: Set Version Number Variable
+      id: versionNumber
+      uses: actions/github-script@v7
+      env:
+        IS_DEV: ${{ contains(github.ref, 'development') }}
+        IS_RC: ${{ contains(github.ref, 'RC') }}
+        VERSION_NUMBER_NIGHTLY: ${{ steps.getPackageInfo.outputs.version }}-nightly-${{ github.run_number }}
+        VERSION_NUMBER_RC: ${{ steps.getPackageInfo.outputs.version }}-RC-${{ github.run_number }}
+        VERSION_NUMBER: ${{ steps.getPackageInfo.outputs.version }}
+      with:
+        result-encoding: string
+        script: |
+          if (${{ env.IS_DEV }}) {
+            return "${{ env.VERSION_NUMBER_NIGHTLY }}"
+          } else if (${{ env.IS_RC }}) {
+            return "${{ env.VERSION_NUMBER_RC }}"
+          } else {
+            return "${{env.VERSION_NUMBER }}"
+          }
+
+    - name: Update package.json version
+      uses: jaywcjlove/github-action-package@main
+      with:
+        version: ${{ steps.versionNumber.outputs.result }}
+
+    - name: Build x64 with Node.js ${{ matrix.node-version}}
+      run: yarn run build
+
+    - name: Create Latest Build
+      id: create_release
+      uses: shxrklol/action-auto-releases-n20@v1.1
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        automatic_release_tag: "latest"
+        prerelease: false
+        title: Latest Build
+
+    - name: upload_packages
+      id: upload_release
+      uses: svenstaro/upload-release-action@2.9.0
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: build/freetube Setup ${{ steps.versionNumber.outputs.result }}.exe
+        asset_name: freetube-${{ steps.versionNumber.outputs.result }}-setup-x64.exe
+        tag: latest
+        overwrite: true
