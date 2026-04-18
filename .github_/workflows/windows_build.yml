@@ -1,0 +1,54 @@
+name: build
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build_windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Sources
+      id: git_checkout
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node
+      id: setup_nodejs
+      uses: actions/setup-node@v6
+      with:
+        node-version: 24
+
+    - name: Setup Yarn
+      id: setup_yarn
+      run: |
+          yarn config set network-timeout 600000 -g
+          yarn run ci
+          yarn run lint
+
+    - name: Build x64
+      id: build_x64
+      run: yarn run build
+
+    - name: Upload Package Artifacts
+      uses: actions/upload-artifact@v6
+      with:
+        name: pkg-artifacts
+        path: build/*.exe
+        compression-level: 0
+
+    - name: Delete tag
+      run: gh release delete latest --cleanup-tag
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Packages
+      id: upload_release
+      uses: svenstaro/upload-release-action@latest
+      with:
+        file_glob: true
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: build/*.exe
+        tag: latest
+        overwrite: true
