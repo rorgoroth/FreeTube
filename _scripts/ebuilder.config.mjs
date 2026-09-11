@@ -110,5 +110,11 @@ export default {
   nsis: {
     allowToChangeInstallationDirectory: true,
     oneClick: false,
+    // eslint-disable-next-line no-template-curly-in-string -- this is an electron-builder placeholder string, not a JS template literal
+    artifactName: '${productName}.Setup.${ext}',
+  },
+  portable: {
+    // eslint-disable-next-line no-template-curly-in-string -- this is an electron-builder placeholder string, not a JS template literal
+    artifactName: '${productName}.${ext}',
   },
 }
